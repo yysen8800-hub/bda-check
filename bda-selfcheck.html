@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>BDA 动作审计 · 七项自查</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #1e1e1e;
+    --border-active: #2a2a2a;
+    --text-primary: #e8e4dc;
+    --text-secondary: #6b6760;
+    --text-muted: #3a3835;
+    --accent: #c8a96e;
+    --accent-dim: #8a7248;
+    --red: #c0392b;
+    --red-dim: #7a241b;
+    --amber: #c8873a;
+    --green: #4a7c59;
+    --green-dim: #2e4f38;
+    --mono: 'JetBrains Mono', monospace;
+    --serif: 'Noto Serif SC', serif;
+  }
+
+  html { background: var(--bg); min-height: 100vh; }
+
+  body {
+    font-family: var(--mono);
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    padding: 0;
+    overflow-x: hidden;
+  }
+
+  /* scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  .container {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0 20px 60px;
+  }
+
+  /* ── header ── */
+  .header {
+    padding: 48px 0 32px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+
+  .brand {
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    margin-bottom: 16px;
+  }
+
+  .title {
+    font-family: var(--serif);
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.4;
+    margin-bottom: 12px;
+  }
+
+  .subtitle {
+    font-size: 11px;
+    color: var(--text-secondary);
+    line-height: 1.8;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── disclaimer ── */
+  .disclaimer {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 2px solid var(--accent-dim);
+    padding: 12px 16px;
+    margin-bottom: 32px;
+    font-size: 10px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    letter-spacing: 0.02em;
+  }
+
+  /* ── progress ── */
+  .progress-bar {
+    height: 1px;
+    background: var(--border);
+    margin-bottom: 32px;
+    position: relative;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+
+  .progress-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.2em;
+    margin-bottom: 8px;
+  }
+
+  /* ── items ── */
+  .check-item {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .check-item:hover {
+    border-color: var(--border-active);
+  }
+
+  .check-item.checked {
+    border-color: var(--red-dim);
+    background: #150d0d;
+  }
+
+  .check-item-inner {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 16px 18px;
+  }
+
+  .check-index {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    min-width: 20px;
+    padding-top: 2px;
+    flex-shrink: 0;
+  }
+
+  .check-item.checked .check-index {
+    color: var(--red-dim);
+  }
+
+  .check-content {
+    flex: 1;
+  }
+
+  .check-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    letter-spacing: 0.01em;
+    transition: color 0.2s;
+  }
+
+  .check-item.checked .check-text {
+    color: #c0392b88;
+  }
+
+  .check-tag {
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.15em;
+    margin-top: 6px;
+    text-transform: uppercase;
+  }
+
+  .check-item.checked .check-tag {
+    color: var(--red-dim);
+  }
+
+  .check-box {
+    width: 16px;
+    height: 16px;
+    border: 1px solid var(--border-active);
+    flex-shrink: 0;
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .check-item.checked .check-box {
+    border-color: var(--red);
+    background: var(--red);
+  }
+
+  .check-mark {
+    opacity: 0;
+    font-size: 10px;
+    color: #fff;
+    transition: opacity 0.15s;
+  }
+
+  .check-item.checked .check-mark {
+    opacity: 1;
+  }
+
+  /* ── score display ── */
+  .score-display {
+    position: sticky;
+    bottom: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border-active);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 24px;
+    z-index: 10;
+  }
+
+  .score-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.2em;
+  }
+
+  .score-count {
+    font-size: 24px;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    transition: color 0.3s;
+  }
+
+  .score-count.warn { color: var(--amber); }
+  .score-count.danger { color: var(--red); }
+
+  .score-status {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-align: right;
+  }
+
+  /* ── result ── */
+  .result-section {
+    display: none;
+    margin-top: 40px;
+    animation: fadeIn 0.5s ease;
+  }
+
+  .result-section.visible { display: block; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .result-divider {
+    height: 1px;
+    background: var(--border);
+    margin-bottom: 32px;
+    position: relative;
+  }
+
+  .result-divider::after {
+    content: 'AUDIT RESULT';
+    position: absolute;
+    top: -8px;
+    left: 0;
+    font-size: 9px;
+    color: var(--text-muted);
+    letter-spacing: 0.3em;
+    background: var(--bg);
+    padding-right: 12px;
+  }
+
+  .result-card {
+    border: 1px solid var(--border);
+    padding: 28px 24px;
+    margin-bottom: 16px;
+  }
+
+  .result-card.green { border-color: var(--green); background: #0a120d; }
+  .result-card.amber { border-color: #6b4a1a; background: #120e07; }
+  .result-card.red { border-color: var(--red-dim); background: #150d0d; }
+
+  .result-verdict {
+    font-size: 9px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .result-card.green .result-verdict { color: var(--green); }
+  .result-card.amber .result-verdict { color: var(--amber); }
+  .result-card.red .result-verdict { color: var(--red); }
+
+  .result-title {
+    font-family: var(--serif);
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 16px;
+    line-height: 1.4;
+  }
+
+  .result-body {
+    font-size: 12px;
+    color: var(--text-secondary);
+    line-height: 1.9;
+    letter-spacing: 0.02em;
+  }
+
+  .result-action {
+    margin-top: 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+
+  .result-action strong {
+    color: var(--accent);
+    font-weight: 500;
+  }
+
+  /* ── cta ── */
+  .cta-block {
+    border: 1px solid var(--border-active);
+    padding: 20px 24px;
+    margin-top: 8px;
+  }
+
+  .cta-hint {
+    font-size: 10px;
+    color: var(--text-muted);
+    letter-spacing: 0.2em;
+    margin-bottom: 10px;
+  }
+
+  .cta-text {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.8;
+  }
+
+  .cta-keyword {
+    display: inline-block;
+    background: var(--accent);
+    color: #0a0a0a;
+    font-size: 11px;
+    padding: 3px 10px;
+    letter-spacing: 0.1em;
+    font-weight: 500;
+    margin: 0 2px;
+  }
+
+  /* ── reset ── */
+  .reset-btn {
+    display: block;
+    width: 100%;
+    margin-top: 32px;
+    padding: 14px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-muted);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+
+  .reset-btn:hover {
+    border-color: var(--border-active);
+    color: var(--text-secondary);
+  }
+
+  /* ── footer ── */
+  .footer {
+    margin-top: 48px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.8;
+    letter-spacing: 0.05em;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="header">
+    <div class="brand">无伤冷控局 · BDA 动作审计系统</div>
+    <h1 class="title">你的训练系统<br>在后台跑Bug了吗？</h1>
+    <p class="subtitle">七项初筛判定 · 无需器械 · 10分钟完成<br>前提：已排除骨折、撕裂等结构性损伤</p>
+  </div>
+
+  <div class="disclaimer">
+    本自查工具仅用于功能性动作模式的初步筛查，不构成医疗诊断。如存在器质性病变（肿瘤、骨折、韧带断裂等），请优先就医，本框架不适用。
+  </div>
+
+  <div class="progress-label" id="progress-label">已完成 0 / 7</div>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+
+  <div id="checklist"></div>
+
+  <div class="score-display">
+    <div>
+      <div class="score-label">异常项</div>
+      <div class="score-count" id="score-count">0</div>
+    </div>
+    <div class="score-status" id="score-status">逐项勾选<br>有异常打√</div>
+  </div>
+
+  <div class="result-section" id="result-section">
+    <div class="result-divider"></div>
+    <div id="result-card"></div>
+    <div class="cta-block" id="cta-block"></div>
+    <button class="reset-btn" onclick="resetAll()">— 重新自查 —</button>
+  </div>
+
+  <div class="footer">
+    本页面为BDA评估前置筛查工具<br>
+    评估结果不替代专业运动功能评估<br>
+    无伤冷控局 · 重庆
+  </div>
+
+</div>
+
+<script>
+const items = [
+  { tag: '关节稳态', text: '深蹲时膝盖习惯性内扣，主动控制也难以纠正' },
+  { tag: '本体感受', text: '目标肌肉没感觉，关节或周边肌群先有感觉——动力链代偿的早期信号' },
+  { tag: '发力精准', text: '练胸时肩膀先酸，练背时脖子先紧，目标区域几乎没有感受' },
+  { tag: '单侧稳定', text: '单腿站立10秒，骨盆明显下沉或身体剧烈晃动' },
+  { tag: '恢复周期', text: '训练后超过48小时，关节仍僵硬而不是肌肉酸痛' },
+  { tag: '动作质量', text: '重量稍微增加，动作姿势立刻变形，无法维持基本模式' },
+  { tag: '系统负荷', text: '熬夜、高压状态下仍强行上量，且恢复明显变差' },
+];
+
+const checked = new Array(7).fill(false);
+
+function render() {
+  const list = document.getElementById('checklist');
+  list.innerHTML = items.map((item, i) => `
+    <div class="check-item ${checked[i] ? 'checked' : ''}" onclick="toggle(${i})">
+      <div class="check-item-inner">
+        <div class="check-index">0${i+1}</div>
+        <div class="check-content">
+          <div class="check-text">${item.text}</div>
+          <div class="check-tag">${item.tag}</div>
+        </div>
+        <div class="check-box"><span class="check-mark">✓</span></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggle(i) {
+  checked[i] = !checked[i];
+  render();
+  updateScore();
+}
+
+function updateScore() {
+  const count = checked.filter(Boolean).length;
+  const answered = checked.filter(v => v !== false || true).length;
+  const total = 7;
+  const el = document.getElementById('score-count');
+  const status = document.getElementById('score-status');
+  const fill = document.getElementById('progress-fill');
+  const label = document.getElementById('progress-label');
+
+  el.textContent = count;
+  el.className = 'score-count' + (count >= 3 ? (count >= 5 ? ' danger' : ' warn') : '');
+
+  const checkedAny = checked.some(v => v);
+  const allDone = true; // show result anytime
+
+  fill.style.width = (count / 7 * 100) + '%';
+  label.textContent = `已完成 ${total} / ${total}`;
+
+  if (count === 0) {
+    status.innerHTML = '逐项勾选<br>有异常打√';
+  } else if (count < 3) {
+    status.innerHTML = '系统相对稳定<br>继续观察';
+  } else if (count < 5) {
+    status.innerHTML = '建议尽快评估<br>存在隐患';
+  } else {
+    status.innerHTML = '立刻停牌<br>高风险状态';
+  }
+
+  showResult(count);
+}
+
+function showResult(count) {
+  const section = document.getElementById('result-section');
+  const card = document.getElementById('result-card');
+  const cta = document.getElementById('cta-block');
+
+  if (!checked.some(v => v)) {
+    section.classList.remove('visible');
+    return;
+  }
+
+  section.classList.add('visible');
+
+  if (count <= 2) {
+    card.innerHTML = `
+      <div class="result-card green">
+        <div class="result-verdict">判定结果 · 可以继续练</div>
+        <div class="result-title">系统运行相对稳定</div>
+        <div class="result-body">
+          异常项 ${count} / 7，当前动力链代偿程度在可控范围内。<br><br>
+          这不意味着可以无限加量。代偿是慢性积累的，不是突然出现的。
+          建议每隔6—8周重新跑一遍这个清单，监控系统状态变化。
+        </div>
+        <div class="result-action">
+          训练中持续观察三个信号：目标肌肉激活感是否下降 · 恢复周期是否变长 · 关节弹响是否伴随疼痛。任何一项出现变化，重新自查。
+        </div>
+      </div>`;
+    cta.innerHTML = `
+      <div class="cta-hint">下一步</div>
+      <div class="cta-text">
+        回到公众号，发送 <span class="cta-keyword">维护</span> 获取训练中的自我监控方法。
+      </div>`;
+  } else if (count <= 4) {
+    card.innerHTML = `
+      <div class="result-card amber">
+        <div class="result-verdict">判定结果 · 建议评估</div>
+        <div class="result-title">系统存在隐性Bug</div>
+        <div class="result-body">
+          异常项 ${count} / 7，动力链已出现代偿接管的早期迹象。<br><br>
+          继续按原计划练不是进步，是在积累医疗账单。
+          现阶段的训练感受良好不代表系统健康——Bug在后台跑，账期到了才报错。
+        </div>
+        <div class="result-action">
+          建议在加重量或增频率之前，先完成一次BDA功能评估，确认哪条链出了问题。
+        </div>
+      </div>`;
+    cta.innerHTML = `
+      <div class="cta-hint">下一步</div>
+      <div class="cta-text">
+        回到公众号，发送 <span class="cta-keyword">评估</span> 了解具体安排。<br>
+        不适合评估的不会被安排，先判定再决定。
+      </div>`;
+  } else {
+    card.innerHTML = `
+      <div class="result-card red">
+        <div class="result-verdict">判定结果 · 立刻停牌</div>
+        <div class="result-title">系统高风险，立即撤回</div>
+        <div class="result-body">
+          异常项 ${count} / 7，当前训练模式已进入加速折旧状态。<br><br>
+          你不是在加固地基，是在给烂尾楼加层。<br>
+          继续练不是意志力，是透支未来五年的关节账户。<br><br>
+          停不是放弃，是止损。保本才是王道。
+        </div>
+        <div class="result-action">
+          <strong>立即停止当前训练计划。</strong><br>
+          前提确认：以上症状是否已排除骨折、撕裂等结构性损伤？如未排查，优先影像学检查。排除后，进行BDA完整功能评估，完成资产重组。
+        </div>
+      </div>`;
+    cta.innerHTML = `
+      <div class="cta-hint">下一步</div>
+      <div class="cta-text">
+        回到公众号，发送 <span class="cta-keyword">评估</span> 了解具体安排。<br>
+        这个状态下的评估是优先级最高的事。
+      </div>`;
+  }
+}
+
+function resetAll() {
+  checked.fill(false);
+  render();
+  updateScore();
+  document.getElementById('result-section').classList.remove('visible');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+render();
+</script>
+</body>
+</html>
